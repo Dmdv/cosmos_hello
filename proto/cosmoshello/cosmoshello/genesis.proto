@@ -1,0 +1,17 @@
+syntax = "proto3";
+package cosmoshello.cosmoshello;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "cosmoshello/cosmoshello/params.proto";
+
+option go_package = "cosmoshello/x/cosmoshello/types";
+
+// GenesisState defines the cosmoshello module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}
