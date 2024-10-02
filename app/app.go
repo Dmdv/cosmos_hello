@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cosmoshello/ante"
 	"io"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
@@ -289,6 +290,17 @@ func New(
 		}
 		return app.App.InitChainer(ctx, req)
 	})
+
+	/****  Ante handler ****/
+	handler, err := ante.NewAnteHandler(ante.HandlerOptions{
+		AccountKeeper: app.AccountKeeper,
+		BankKeeper:    app.BankKeeper,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	app.SetAnteHandler(handler)
 
 	if err := app.Load(loadLatest); err != nil {
 		return nil, err
