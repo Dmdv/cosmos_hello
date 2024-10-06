@@ -11,10 +11,9 @@ type HandlerOptions struct {
 	BankKeeper    types.BankKeeper
 }
 
-func NewAnteHandler(opts HandlerOptions) (sdk.AnteHandler, error) {
+func NewFeeAnteHandler(opts HandlerOptions) (sdk.AnteHandler, error) {
 	anteDecorators := []sdk.AnteDecorator{
-		ante.NewConsumeGasForTxSizeDecorator(opts.AccountKeeper),
-		NewDeductFeeDecorator(opts.AccountKeeper, opts.BankKeeper, nil),
+		NewDeductFeeDecorator(opts.AccountKeeper, opts.BankKeeper),
 	}
 
 	return sdk.ChainAnteDecorators(anteDecorators...), nil

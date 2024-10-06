@@ -1,10 +1,8 @@
 package ante
 
 import (
-	"fmt"
-	"math"
-
 	errorsmod "cosmossdk.io/errors"
+	"fmt"
 
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -21,10 +19,6 @@ const (
 	LargeTransactionFeeMultiplier = 2
 )
 
-// TxFeeChecker check if the provided fee is enough and returns the effective fee and tx priority,
-// the effective fee should be deducted later, and the priority should be returned in abci response.
-type TxFeeChecker func(ctx sdk.Context, tx sdk.Tx) (sdk.Coins, int64, error)
-
 // DeductFeeDecorator deducts fees from the fee payer. The fee payer is the fee granter (if specified) or first signer of the tx.
 // If the fee payer does not have the funds to pay for the fees, return an InsufficientFunds error.
 // Call next AnteHandler if fees successfully deducted.
@@ -32,18 +26,12 @@ type TxFeeChecker func(ctx sdk.Context, tx sdk.Tx) (sdk.Coins, int64, error)
 type DeductFeeDecorator struct {
 	accountKeeper ante.AccountKeeper
 	bankKeeper    types.BankKeeper
-	txFeeChecker  TxFeeChecker
 }
 
-func NewDeductFeeDecorator(ak ante.AccountKeeper, bk types.BankKeeper, tfc TxFeeChecker) DeductFeeDecorator {
-	if tfc == nil {
-		tfc = checkTxFeeWithValidatorMinGasPrices
-	}
-
+func NewDeductFeeDecorator(ak ante.AccountKeeper, bk types.BankKeeper) DeductFeeDecorator {
 	return DeductFeeDecorator{
 		accountKeeper: ak,
 		bankKeeper:    bk,
-		txFeeChecker:  tfc,
 	}
 }
 
@@ -58,13 +46,12 @@ func (dfd DeductFeeDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bo
 	}
 
 	var (
-		priority int64
-		err      error
+		err error
 	)
 
 	fee := feeTx.GetFee()
 	if !simulate {
-		fee, priority, err = dfd.txFeeChecker(ctx, tx)
+		fee, err = checkTxFeeWithValidatorMinGasPrices(ctx, tx)
 		if err != nil {
 			return ctx, err
 		}
@@ -81,9 +68,7 @@ func (dfd DeductFeeDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bo
 		return ctx, err
 	}
 
-	newCtx := ctx.WithPriority(priority)
-
-	return next(newCtx, tx, simulate)
+	return next(ctx, tx, simulate)
 }
 
 func (dfd DeductFeeDecorator) checkDeductFee(ctx sdk.Context, sdkTx sdk.Tx, fee sdk.Coins) error {
@@ -139,19 +124,19 @@ func DeductFees(bankKeeper types.BankKeeper, ctx sdk.Context, acc sdk.AccountI, 
 }
 
 // checkTxFeeWithValidatorMinGasPrices implements the default fee logic, where the minimum price per
-// unit of gas is fixed and set by each validator, can the tx priority is computed from the gas price.
-func checkTxFeeWithValidatorMinGasPrices(ctx sdk.Context, tx sdk.Tx) (sdk.Coins, int64, error) {
+// unit of gas is fixed and set by each validator, can the tx priority be computed from the gas price.
+func checkTxFeeWithValidatorMinGasPrices(ctx sdk.Context, tx sdk.Tx) (sdk.Coins, error) {
 	feeTx, ok := tx.(sdk.FeeTx)
 	if !ok {
-		return nil, 0, errorsmod.Wrap(sdkerrors.ErrTxDecode, "Tx must be a FeeTx")
+		return nil, errorsmod.Wrap(sdkerrors.ErrTxDecode, "Tx must be a FeeTx")
 	}
 
 	feeCoins := feeTx.GetFee()
 	gas := feeTx.GetGas()
 
-	// Ensure that the provided fees meet a minimum threshold for the validator,
+	// Ensure that the provided fees meet a minimum threshold for the validator
 	// if this is a CheckTx. This is only for local mempool purposes, and thus
-	// is only ran on check tx.
+	// is only run on check tx.
 	if ctx.IsCheckTx() {
 		minGasPrices := ctx.MinGasPrices()
 		if !minGasPrices.IsZero() {
@@ -166,31 +151,10 @@ func checkTxFeeWithValidatorMinGasPrices(ctx sdk.Context, tx sdk.Tx) (sdk.Coins,
 			}
 
 			if !feeCoins.IsAnyGTE(requiredFees) {
-				return nil, 0, errorsmod.Wrapf(sdkerrors.ErrInsufficientFee, "insufficient fees; got: %s required: %s", feeCoins, requiredFees)
+				return nil, errorsmod.Wrapf(sdkerrors.ErrInsufficientFee, "insufficient fees; got: %s required: %s", feeCoins, requiredFees)
 			}
 		}
 	}
 
-	priority := getTxPriority(feeCoins, int64(gas))
-	return feeCoins, priority, nil
-}
-
-// getTxPriority returns a naive tx priority based on the amount of the smallest denomination of the gas price
-// provided in a transaction.
-// NOTE: This implementation should be used with a great consideration as it opens potential attack vectors
-// where txs with multiple coins could not be prioritize as expected.
-func getTxPriority(fee sdk.Coins, gas int64) int64 {
-	var priority int64
-	for _, c := range fee {
-		p := int64(math.MaxInt64)
-		gasPrice := c.Amount.QuoRaw(gas)
-		if gasPrice.IsInt64() {
-			p = gasPrice.Int64()
-		}
-		if priority == 0 || p < priority {
-			priority = p
-		}
-	}
-
-	return priority
+	return feeCoins, nil
 }

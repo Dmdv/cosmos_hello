@@ -292,7 +292,7 @@ func New(
 	})
 
 	/****  Ante handler ****/
-	handler, err := ante.NewAnteHandler(ante.HandlerOptions{
+	handler, err := ante.NewFeeAnteHandler(ante.HandlerOptions{
 		AccountKeeper: app.AccountKeeper,
 		BankKeeper:    app.BankKeeper,
 	})
