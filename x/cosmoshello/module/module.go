@@ -143,15 +143,33 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 // To avoid wrong/empty versions, the initial version should be set to 1.
 func (AppModule) ConsensusVersion() uint64 { return 1 }
 
-// BeginBlock contains the logic that is automatically triggered at the beginning of each block.
+// BeginBlock contains the logic automatically triggered at the beginning of each block.
 // The begin block implementation is optional.
-func (am AppModule) BeginBlock(_ context.Context) error {
+func (am AppModule) BeginBlock(ctx context.Context) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	am.keeper.Logger().Info("BeginBlock", "height", sdkCtx.BlockHeight())
+
+	votes := sdkCtx.CometInfo().GetLastCommit().Votes()
+	voteLen := votes.Len()
+
+	// determine the total power signing the block
+	var previousTotalPower1 int64
+	for i := 0; i < voteLen; i++ {
+		voteInfo := votes.Get(i)
+		previousTotalPower1 += voteInfo.Validator().Power()
+	}
+
+	am.keeper.Logger().Info("BeginBlock", "previousTotalPower", previousTotalPower1)
+
 	return nil
 }
 
-// EndBlock contains the logic that is automatically triggered at the end of each block.
+// EndBlock contains the logic automatically triggered at the end of each block.
 // The end block implementation is optional.
-func (am AppModule) EndBlock(_ context.Context) error {
+func (am AppModule) EndBlock(ctx context.Context) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	am.keeper.Logger().Info("EndBlock", "height", sdkCtx.BlockHeight())
+
 	return nil
 }
 
