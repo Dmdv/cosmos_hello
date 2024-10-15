@@ -153,13 +153,13 @@ func (am AppModule) BeginBlock(ctx context.Context) error {
 	voteLen := votes.Len()
 
 	// determine the total power signing the block
-	var previousTotalPower1 int64
+	var previousTotalPower int64
 	for i := 0; i < voteLen; i++ {
 		voteInfo := votes.Get(i)
-		previousTotalPower1 += voteInfo.Validator().Power()
+		previousTotalPower += voteInfo.Validator().Power()
 	}
 
-	am.keeper.Logger().Info("BeginBlock", "previousTotalPower", previousTotalPower1)
+	am.keeper.Logger().Info("BeginBlock", "previousTotalPower", previousTotalPower)
 
 	return nil
 }

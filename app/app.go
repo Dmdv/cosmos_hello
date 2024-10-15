@@ -79,6 +79,8 @@ import (
 	cosmoshellomodulekeeper "cosmoshello/x/cosmoshello/keeper"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
+	app_abci "cosmoshello/x/cosmoshello/abci"
+
 	"cosmoshello/docs"
 )
 
@@ -251,6 +253,18 @@ func New(
 	); err != nil {
 		panic(err)
 	}
+
+	propHandler := app_abci.NewProposalHandler(
+		logger,
+		app.CosmoshelloKeeper,
+		app.StakingKeeper,
+	)
+
+	// Register OracleApp with the base application
+	baseAppOptions = append(baseAppOptions, func(ba *baseapp.BaseApp) {
+		ba.SetPrepareProposal(propHandler.PrepareProposal())
+		ba.SetProcessProposal(propHandler.ProcessProposal())
+	})
 
 	// add to default baseapp options
 	// enable optimistic execution
